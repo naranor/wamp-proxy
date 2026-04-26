@@ -8,12 +8,15 @@ services:
     ports:
       - "${PORT:-3000}:3000"
     environment:
-      - PORT=3000
-      - UPSTREAM_URL=${UPSTREAM_URL:-https://api.openai.com}
+      - UPSTREAM_URL=${UPSTREAM_URL:-http://192.168.92.2:8383/api/v1}
       - ENABLE_ATTENTION_FILTER=${ENABLE_ATTENTION_FILTER:-true}
+      - FILTER_MODEL_DIR=${FILTER_MODEL_DIR:-/app/deberta_nli_model}
       - FILTER_THRESHOLD_MULTIPLIER=${FILTER_THRESHOLD_MULTIPLIER:-1.0}
+      - FILTER_NEEDLE_MULT=${FILTER_NEEDLE_MULT:-0.98}
+      - FILTER_REASONING_MULT=${FILTER_REASONING_MULT:-0.92}
+      - FILTER_SUMMARY_MULT=${FILTER_SUMMARY_MULT:-0.90}
       - FILTER_MAX_TOKENS=${FILTER_MAX_TOKENS:-1024}
     restart: unless-stopped
     volumes:
-      - ./modernbert_model:/app/modernbert_model
+      - ./deberta_nli_model:/app/deberta_nli_model
       - ./logs:/app/logs
