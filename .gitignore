@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Логи и временные файлы
+*.log
+mock.log
+proxy.log
+*.err
+*.pid
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Тестовые скрипты и артефакты (оставляем только нужное)
+test_*.py
+generate_test.py
+run_*.py
+test-model.js
+test-order.js
+test-tokenizer-model.js
+test_proxy_request.js
+mock_upstream_run.cmd
+proxy_run.cmd
+stop_all.cmd
+
+# Сборка и зависимости
+# (node_modules удалены)
+
+# Documentation
+# *.md - do not ignore
+
+# Large binary models (downloaded automatically)
+modernbert_model/
+deberta_small_model/
+modernbert_large_model/
+deberta_nli_model/
+
+# Secrets
+.env
+
+# Core directories
+# src/ is NOT ignored!
+
+.agents

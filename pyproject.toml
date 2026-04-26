@@ -1,0 +1,38 @@
+[project]
+name = "wamp-proxy"
+version = "1.0.0"
+description = "Smart OpenAI-compatible proxy with context compression using ModernBERT"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "wamp-proxy contributors"}
+]
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.27.1",
+    "httpx>=0.27.0",
+    "onnxruntime>=1.20.0",
+    "numpy>=1.26.4",
+    "huggingface_hub>=0.21.4",
+    "tokenizers>=0.19.1",
+    "python-dotenv>=1.0.1",
+]
+
+[project.scripts]
+wamp = "main:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

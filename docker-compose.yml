@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  wamp-proxy:
+    build: .
+    image: wamp-proxy:latest
+    container_name: wamp-proxy
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - PORT=3000
+      - UPSTREAM_URL=${UPSTREAM_URL:-https://api.openai.com}
+      - ENABLE_ATTENTION_FILTER=${ENABLE_ATTENTION_FILTER:-true}
+      - FILTER_THRESHOLD_MULTIPLIER=${FILTER_THRESHOLD_MULTIPLIER:-1.0}
+      - FILTER_MAX_TOKENS=${FILTER_MAX_TOKENS:-1024}
+    restart: unless-stopped
+    volumes:
+      - ./modernbert_model:/app/modernbert_model
+      - ./logs:/app/logs
