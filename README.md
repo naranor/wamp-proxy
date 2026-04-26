@@ -12,13 +12,17 @@
 
 ## 📊 Research Results (Long Context, 100+ msgs)
 
-Our final calibrated policy achieves **100% Information Recall** across all core scenarios with significant token savings.
+## Mode A: SAFE (Coding & Logic)
+*Recommended for AI Agents, Developers, and Technical QA.*
+**Goal:** 100% Information Recall.
 
-| Scenario | Mode | Savings % | Result | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| **Needle In A Haystack** | Precise | **27.7%** | ✅ **PASSED** | Pinpoint fact retrieval (Argon2id test). |
-| **Multi-Doc Reasoning** | Logical | **34.2%** | ✅ **PASSED** | Preserving complex logical links between docs. |
-| **Coherence & Summary** | Broad | **45.6%** | ✅ **PASSED** | Maintaining technical architecture flow. |
+| Scenario | Multiplier | Token Savings | Recall | Verdict | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Needle In A Haystack** | 0.98 | **17.1%** | **100%** | ✅ SAFE | Pinpoint fact retrieval (Argon2id test). |
+| **Multi-Doc Reasoning** | 0.92 | **0.9%** | **100%** | ✅ SAFE | Preserving complex logical links between docs. |
+| **Coherence & Summary**| 0.90 | **43.0%** | 75% | ⚠️ FLOW | Maintaining technical architecture flow. |
+
+**Insight:** In Safe Mode, the proxy acts as a "noise gate." It only removes 100% redundant chatter while keeping every logical link and pinpoint fact intact.
 
 ## 🧠 The Tri-modal Adaptive Engine
 
