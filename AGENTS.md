@@ -6,7 +6,9 @@ This file describes the structure and specifics of the **Weighted Attention Mess
 
 ## 📌 Project at a Glance
 
-WAMP is a research-oriented context compression engine. It implements a **Tri-modal Adaptive Engine** that uses a hybrid intent classifier (Statistical + LogReg) to select the optimal pruning strategy for each user query.
+WAMP is a research-oriented context compression engine. It implements a **Tri-modal Adaptive Engine** that uses a high-precision composite classifier (89%+ accuracy) to select the optimal pruning strategy for each user query.
+
+**Core Model:** `DeBERTa-v3-small-NLI` (INT8 ONNX) – modified to expose hidden attention states.
 
 ---
 
@@ -33,30 +35,38 @@ wamp-proxy/
 
 ## 🧠 The Tri-modal Adaptive Engine
 
-### 1. Hybrid Intent Routing
-Located in `WAMPruner.classify_task`.
-- **Stage 1 (Needle):** Statistical attention peak detection (Mean > 0.12).
-- **Stage 2 (Reasoning):** Binary LogReg classifier on Mean-Pooled embeddings.
-- **Stage 3 (Summary):** Keyword-based boost + Default fallback.
+### 1. Composite Intent Routing
+Located in `WAMPruner.classify_task`. Classification is performed on the **raw user query** to avoid system prompt interference.
+- **Features:** 1539-dimension vector [CLS + Mean + Kurtosis + Max + Length].
+- **Hierarchy:**
+    - **Stage 1 (Reasoning):** Binary LogReg (vs All). High priority for logic preservation.
+    - **Stage 2 (Needle):** Binary LogReg (vs All). Specific fact retrieval.
+    - **Stage 3 (Summary):** Default fallback for general recap tasks.
 
-### 2. Specialized Pruning Algorithms
-- **Needle:** `mean_max` (multiplier 0.98).
-- **Reasoning:** `max_max` (multiplier 1.00).
-- **Summary:** `mean_mean` (multiplier 0.96).
-
----
-
-## 🧪 Testing & Research
-
-### Core Research Scripts
-- `benchmarks/mass_calibrate_long.py`: Ultra-granular threshold research.
-- `benchmarks/router_audit.py`: Verifying the accuracy of the Hybrid Classifier.
-- `benchmarks/adaptive_research.py`: Testing the final Tri-modal policy locally.
-
-### CI/CD
-- `.github/workflows/lint.yml`: Automatic Ruff linting.
-- `.github/workflows/docker-build.yml`: Automated build and push to GHCR.
+### 2. Specialized Pruning Policies (Safe Mode)
+| Category | Algorithm | Multiplier | Focus |
+| :--- | :--- | :--- | :--- |
+| **Reasoning** | `cls_max` | **0.92** | Logical chains & synthesis |
+| **Needle** | `mean_max` | **0.98** | Pinpoint parameter retrieval |
+| **Summary** | `mean_mean` | **0.90** | Global semantic compression |
 
 ---
 
-*Last Updated: April 25, 2026 (Refactored Research Version 2.0)*
+## 📊 Performance Benchmarks (Raw Tokens)
+
+| Mode | Scenario | Token Savings | Recall | Verdict |
+| :--- | :--- | :--- | :--- | :--- |
+| **SAFE** | Needle / Logic | **1-17%** | **100%** | ✅ Recommended for Agents |
+| **AGGRESSIVE** | Needle / Logic | **45-50%** | **0-14%** | ❌ High risk of data loss |
+| **BALANCED** | Summary | **43%** | **75%** | ⚠️ Good for general chat |
+
+---
+
+## 🧪 Key Research Scripts
+- `tools/train_router.py`: Unified trainer for both Needle and Reasoning classifiers.
+- `tools/audit_truth.py`: Honest token-based savings audit (v4).
+- `benchmarks/final_validation_no_proxy.py`: Long-context (114+ msg) validation script.
+
+---
+
+*Last Updated: April 25, 2026 (Refactored Research Version 3.0 - Truthful Audit)*
