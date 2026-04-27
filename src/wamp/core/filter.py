@@ -6,6 +6,7 @@ import hashlib
 from pathlib import Path
 from typing import List, Tuple, Dict, Any
 from tokenizers import Tokenizer
+from huggingface_hub import snapshot_download
 from .config import (
     FILTER_MODEL_NAME,
     FILTER_MODEL_DIR,
@@ -78,12 +79,38 @@ class WAMPruner:
         return hasher.hexdigest()
 
     def _ensure_model_exists(self):
+        """Check if model files exist. Download from HF if missing."""
         required_files = ["tokenizer.json", "model_quantized.onnx"]
         missing = [f for f in required_files if not (self.model_dir / f).exists()]
-        if missing and not (self.model_dir / "model.onnx").exists():
-            error_msg = f"Missing model files in {self.model_dir}: {missing}"
-            logger.error(error_msg)
-            raise FileNotFoundError(error_msg)
+
+        # Fallback check for unquantized model
+        if (
+            not (self.model_dir / "model_quantized.onnx").exists()
+            and (self.model_dir / "model.onnx").exists()
+        ):
+            if not (self.model_dir / "tokenizer.json").exists():
+                missing = ["tokenizer.json"]
+            else:
+                return
+
+        if missing:
+            logger.info(
+                f"Model files {missing} missing in {self.model_dir}. Attempting download from HF: {FILTER_MODEL_NAME}..."
+            )
+            try:
+                snapshot_download(
+                    repo_id=FILTER_MODEL_NAME,
+                    local_dir=self.model_dir,
+                    local_dir_use_symlinks=False,
+                    ignore_patterns=["*.msgpack", "*.h5", "*.bin", "*.pt", "*.tflite", "*.ot"],
+                )
+                logger.info(
+                    f"✓ Model {FILTER_MODEL_NAME} downloaded successfully to {self.model_dir}"
+                )
+            except Exception as e:
+                error_msg = f"Failed to download model {FILTER_MODEL_NAME}: {e}"
+                logger.error(error_msg)
+                raise RuntimeError(error_msg)
 
     def get_content(self, msg: Dict[str, Any]) -> str:
         content = msg.get("content", "")

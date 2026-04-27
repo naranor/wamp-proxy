@@ -2,7 +2,7 @@ import asyncio
 import httpx
 import time
 
-PROXY_URL = "http://localhost:3000/v1/chat/completions"
+PROXY_URL = "http://localhost:3000/chat/completions"
 DIRECT_URL = "http://192.168.92.2:8383/api/v1/chat/completions"
 
 
