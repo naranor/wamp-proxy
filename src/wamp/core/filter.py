@@ -6,6 +6,7 @@ import hashlib
 from pathlib import Path
 from typing import List, Tuple, Dict, Any
 from tokenizers import Tokenizer
+from huggingface_hub import snapshot_download
 from .config import (
     FILTER_MODEL_NAME,
     FILTER_MODEL_DIR,

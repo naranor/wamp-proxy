@@ -48,6 +48,7 @@ modernbert_model/
 deberta_small_model/
 modernbert_large_model/
 deberta_nli_model/
+model/
 
 # Secrets
 .env
