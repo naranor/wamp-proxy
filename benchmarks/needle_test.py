@@ -79,7 +79,9 @@ async def ask_model(name, url, messages, expected="argon2id", model="auto"):
             is_correct = expected.lower() in choice.lower()
             status = "✅ PASSED" if is_correct else "❌ FAILED"
 
-            print(f"[{status}] Ответ: '{choice.strip()}' | Время: {elapsed:.2f}с | Токены (входящие): {prompt_tokens}")
+            print(
+                f"[{status}] Ответ: '{choice.strip()}' | Время: {elapsed:.2f}с | Токены (входящие): {prompt_tokens}"
+            )
             return {"tokens": prompt_tokens, "correct": is_correct, "time": elapsed}
 
     except Exception as e:

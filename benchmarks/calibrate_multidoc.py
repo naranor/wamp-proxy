@@ -41,6 +41,7 @@ def calibrate_multi_doc():
 
     # Increase range to find where compression starts
     import numpy as np
+
     for mult in np.arange(0.9, 1.11, 0.01):
         threshold = mean_score * mult
         kept = [

@@ -80,7 +80,7 @@ async def main():
             # Health gives upstream, let's try to get model from direct
             res = await client.get("http://192.168.92.2:8383/api/v1/models")
             model_name = res.json()["data"][0]["id"]
-    except:
+    except Exception:
         pass
 
     print(f"Общее кол-во сообщений: {len(messages)}")

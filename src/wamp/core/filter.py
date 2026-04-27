@@ -6,12 +6,10 @@ import hashlib
 from pathlib import Path
 from typing import List, Tuple, Dict, Any
 from tokenizers import Tokenizer
-from huggingface_hub import snapshot_download
 from .config import (
     FILTER_MODEL_NAME,
     FILTER_MODEL_DIR,
     FILTER_MAX_TOKENS,
-    FILTER_THRESHOLD_MULTIPLIER,
     FILTER_NEEDLE_MULT,
     FILTER_REASONING_MULT,
     FILTER_SUMMARY_MULT,
@@ -90,7 +88,9 @@ class WAMPruner:
     def get_content(self, msg: Dict[str, Any]) -> str:
         content = msg.get("content", "")
         if isinstance(content, list):
-            return " ".join([part.get("text", "") for part in content if part.get("type") == "text"])
+            return " ".join(
+                [part.get("text", "") for part in content if part.get("type") == "text"]
+            )
         return str(content)
 
     def classify_task(self, task_text: str) -> str:
@@ -115,21 +115,34 @@ class WAMPruner:
 
         # --- Stage 1: Reasoning Detection (High Priority) ---
         if self.router_weights:
-            summary_keywords = ["summarize", "summary", "tldr", "overview", "recap", "synopsis", "condense", "briefly"]
+            summary_keywords = [
+                "summarize",
+                "summary",
+                "tldr",
+                "overview",
+                "recap",
+                "synopsis",
+                "condense",
+                "briefly",
+            ]
             if any(kw in task_text.lower() for kw in summary_keywords):
                 return "Summary"
 
-            w_r, b_r = np.array(self.router_weights["coef"]), np.array(self.router_weights["intercept"])
+            w_r, b_r = (
+                np.array(self.router_weights["coef"]),
+                np.array(self.router_weights["intercept"]),
+            )
             prob_reasoning = 1 / (1 + np.exp(-(np.dot(w_r, features) + b_r)[0]))
             if prob_reasoning > 0.5:
                 logger.info(f"Stage 1: Reasoning detected (p={prob_reasoning:.2f})")
                 return "Reasoning"
 
-
-
         # --- Stage 2: Needle Detection ---
         if self.needle_weights:
-            w_n, b_n = np.array(self.needle_weights["coef"]), np.array(self.needle_weights["intercept"])
+            w_n, b_n = (
+                np.array(self.needle_weights["coef"]),
+                np.array(self.needle_weights["intercept"]),
+            )
             prob_needle = 1 / (1 + np.exp(-(np.dot(w_n, features) + b_n)[0]))
 
             # Set threshold to 0.7 for balance
@@ -140,9 +153,14 @@ class WAMPruner:
         return "Summary"
 
     def get_attention_filtered(
-        self, messages: List[Dict[str, Any]], task: str, original_query: str = None, keep_last_n: int = 4
+        self,
+        messages: List[Dict[str, Any]],
+        task: str,
+        original_query: str = None,
+        keep_last_n: int = 4,
     ) -> Tuple[List[Dict[str, Any]], List[float], float, float]:
         import time
+
         t_start = time.time()
 
         # Classify based on the raw user query if provided, otherwise the full task
@@ -160,10 +178,12 @@ class WAMPruner:
         logger.info(f"Policy: {task_category} | {algo} | mult={mult}")
 
         total = len(messages)
-        if total <= 2: return messages, [], 0.0, 0.0
+        if total <= 2:
+            return messages, [], 0.0, 0.0
 
         always_keep = {0}
-        for i in range(max(1, total - keep_last_n), total): always_keep.add(i)
+        for i in range(max(1, total - keep_last_n), total):
+            always_keep.add(i)
 
         task_enc = self.tokenizer.encode(f"TASK: {task}\n\n")
         task_ids, task_len = task_enc.ids, len(task_enc.ids)
@@ -173,8 +193,9 @@ class WAMPruner:
 
         for idx in range(total):
             if idx in always_keep:
-                all_scores_dict[idx] = 1.0; continue
-            
+                all_scores_dict[idx] = 1.0
+                continue
+
             content = self.get_content(messages[idx])
             cache_key = self._get_cache_key(task, content, algo)
 
@@ -182,21 +203,32 @@ class WAMPruner:
                 all_scores_dict[idx] = self._score_cache[cache_key]
             else:
                 msg_ids = self.tokenizer.encode(f"Msg: {content}\n").ids[: 128 - task_len]
-                batch_queue.append({"idx": idx, "ids": msg_ids, "len": len(msg_ids), "key": cache_key, "algo": algo})
+                batch_queue.append(
+                    {
+                        "idx": idx,
+                        "ids": msg_ids,
+                        "len": len(msg_ids),
+                        "key": cache_key,
+                        "algo": algo,
+                    }
+                )
 
             if len(batch_queue) >= 32:
                 self._process_batch(batch_queue, task_ids, task_len, all_scores_dict)
                 batch_queue = []
 
-        if batch_queue: self._process_batch(batch_queue, task_ids, task_len, all_scores_dict)
+        if batch_queue:
+            self._process_batch(batch_queue, task_ids, task_len, all_scores_dict)
 
         all_scores = [all_scores_dict.get(i, 0.0) for i in range(total)]
         filterable = [all_scores[i] for i in range(total) if i not in always_keep]
         baseline = float(np.median(filterable)) if filterable else 0.0
         threshold = baseline * mult
 
-        filtered = [messages[i] for i in range(total) if i in always_keep or all_scores[i] >= threshold]
-        logger.info(f"Done in {time.time()-t_start:.3f}s")
+        filtered = [
+            messages[i] for i in range(total) if i in always_keep or all_scores[i] >= threshold
+        ]
+        logger.info(f"Done in {time.time() - t_start:.3f}s")
         return filtered, all_scores, threshold, baseline
 
     def _process_batch(self, batch_data, task_ids, task_len, scores_dict):
@@ -207,23 +239,30 @@ class WAMPruner:
 
         for i, item in enumerate(batch_data):
             seq = task_ids + item["ids"]
-            input_ids[i, :len(seq)] = seq
-            attention_mask[i, :len(seq)] = 1
+            input_ids[i, : len(seq)] = seq
+            attention_mask[i, : len(seq)] = 1
 
-        outputs = self.session.run(self.output_names, {'input_ids': input_ids, 'attention_mask': attention_mask})
+        outputs = self.session.run(
+            self.output_names, {"input_ids": input_ids, "attention_mask": attention_mask}
+        )
 
         for i, item in enumerate(batch_data):
             importance = 0.0
             for layer_attn in outputs:
                 # slice: (heads, task_tokens, msg_tokens)
-                slc = layer_attn[i, :, :task_len, task_len:task_len+item["len"]]
-                if slc.size == 0: continue
-                
+                slc = layer_attn[i, :, :task_len, task_len : task_len + item["len"]]
+                if slc.size == 0:
+                    continue
+
                 algo = item["algo"]
-                if algo == "mean_max": importance += float(np.mean(np.max(slc, axis=-1)))
-                elif algo == "max_max": importance += float(np.max(slc))
-                elif algo == "mean_mean": importance += float(np.mean(slc))
-                elif algo == "cls_max": importance += float(np.max(slc[:, 0, :])) # Attention FROM [CLS] to msg
+                if algo == "mean_max":
+                    importance += float(np.mean(np.max(slc, axis=-1)))
+                elif algo == "max_max":
+                    importance += float(np.max(slc))
+                elif algo == "mean_mean":
+                    importance += float(np.mean(slc))
+                elif algo == "cls_max":
+                    importance += float(np.max(slc[:, 0, :]))  # Attention FROM [CLS] to msg
 
             score = importance / len(self.output_names)
             scores_dict[item["idx"]] = score
