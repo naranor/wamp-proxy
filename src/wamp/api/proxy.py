@@ -14,6 +14,7 @@ app = FastAPI(title="WAMP - OpenAI API Proxy with Attention Filter")
 
 filter_pruner = None
 
+
 @app.on_event("startup")
 async def startup_event():
     global filter_pruner
@@ -24,13 +25,14 @@ async def startup_event():
         except Exception as e:
             logger.error(f"⚠ Failed to initialize filter: {e}")
 
+
 @app.get("/health")
 async def health():
     return {
-        "status": "ok", 
-        "service": "wamp", 
+        "status": "ok",
+        "service": "wamp",
         "upstream": UPSTREAM_URL,
-        "filter_enabled": filter_pruner is not None
+        "filter_enabled": filter_pruner is not None,
     }
 
 

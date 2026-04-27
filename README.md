@@ -16,11 +16,11 @@
 *Recommended for AI Agents, Developers, and Technical QA.*
 **Goal:** 100% Information Recall.
 
-| Scenario | Multiplier | Token Savings | Recall | Verdict | Description |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Needle In A Haystack** | 0.98 | **17.1%** | **100%** | ✅ SAFE | Pinpoint fact retrieval (Argon2id test). |
-| **Multi-Doc Reasoning** | 0.92 | **0.9%** | **100%** | ✅ SAFE | Preserving complex logical links between docs. |
-| **Coherence & Summary**| 0.90 | **43.0%** | 75% | ⚠️ FLOW | Maintaining technical architecture flow. |
+| Scenario                   | Algo      | Multiplier | Token Savings | Recall | Verdict | Description |
+|:---------------------------|:----------| :--------- | :------------ | :----- | :------ |:------------|
+| **Needle In A Haystack**   | Mean-MAX  | 0.98 | **17.1%** | **100%** | ✅ SAFE | Pinpoint fact retrieval (Argon2id test). |
+| **Multi-Doc Reasoning**    | Max-Max   | 0.92 | **0.9%** | **100%** | ✅ SAFE | Preserving complex logical links between docs. |
+| **Coherence & Summary**    | Mean-Mean | 0.90 | **43.0%** | 75% | ⚠️ FLOW | Maintaining technical architecture flow. |
 
 **Insight:** In Safe Mode, the proxy acts as a "noise gate." It only removes 100% redundant chatter while keeping every logical link and pinpoint fact intact.
 

@@ -13,21 +13,40 @@ DOCUMENTS = [
     "Alpha budget: $5 million. Beta budget: $3 million.",
     "Alpha uses Python, Beta uses Julia.",
     "Project 'Gamma' was cancelled in 2023.",
-    "CyberShield manages security protocols for all projects."
+    "CyberShield manages security protocols for all projects.",
 ]
 
+
 def generate_multi_doc_long():
-    messages = [{"role": "system", "content": "You are a research assistant. Use the provided fragments to answer questions."}]
+    messages = [
+        {
+            "role": "system",
+            "content": "You are a research assistant. Use the provided fragments to answer questions.",
+        }
+    ]
     for i, doc in enumerate(DOCUMENTS):
-        messages.append({"role": "user", "content": f"Doc {i+1}: {doc}"})
+        messages.append({"role": "user", "content": f"Doc {i + 1}: {doc}"})
         messages.append({"role": "assistant", "content": "Fragment received."})
         # Add a lot of noise between documents (6 pairs per doc)
         for j in range(6):
-            messages.append({"role": "user", "content": f"Random chat {i}-{j}: Tell me about topic {j}."})
-            messages.append({"role": "assistant", "content": f"Topic {j} is not relevant to our project data, but interesting."})
-            
-    messages.append({"role": "user", "content": "Compare the budgets and lead scientists of projects Alpha and Beta. Who has more funding?"})
+            messages.append(
+                {"role": "user", "content": f"Random chat {i}-{j}: Tell me about topic {j}."}
+            )
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": f"Topic {j} is not relevant to our project data, but interesting.",
+                }
+            )
+
+    messages.append(
+        {
+            "role": "user",
+            "content": "Compare the budgets and lead scientists of projects Alpha and Beta. Who has more funding?",
+        }
+    )
     return messages
+
 
 async def run_test(name, url, messages, model="auto"):
     print(f"\n--- {name} ---")
@@ -47,23 +66,26 @@ async def run_test(name, url, messages, model="auto"):
         print(f"❌ Error: {e}")
         return None
 
+
 async def main():
     print("=== BENCHMARK: Multi-Doc QA (Long: 100+ msgs) ===")
     messages = generate_multi_doc_long()
     print(f"Total messages: {len(messages)}")
-    
+
     model_name = "auto"
     try:
         async with httpx.AsyncClient() as client:
             res = await client.get("http://192.168.92.2:8383/api/v1/models")
             model_name = res.json()["data"][0]["id"]
-    except: pass
+    except Exception:
+        pass
 
     t_direct = await run_test("DIRECT", DIRECT_URL, messages, model=model_name)
     t_proxy = await run_test("WAMP PROXY", PROXY_URL, messages, model=model_name)
-    
+
     if t_direct and t_proxy:
-        print(f"\n🎉 SAVINGS: {(1 - t_proxy/t_direct)*100:.1f}%")
+        print(f"\n🎉 SAVINGS: {(1 - t_proxy / t_direct) * 100:.1f}%")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
