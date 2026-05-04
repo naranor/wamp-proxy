@@ -10,37 +10,40 @@
 
 **WAMP** is an intelligent middleware designed for research into LLM context optimization. It analyzes incoming message history using a small encoder (DeBERTa-v3) and prunes redundant messages while preserving critical semantic signal using dynamic attention-based policies.
 
+## 📦 Hugging Face Resources
+
+- **Model:** [SetFit Multilingual ONNX Router V1](https://huggingface.co/naranor/SetFit-Multilingual-ONNX-Router-V1) (Optimized INT8 ONNX with Attentions)
+- **Dataset:** [WAMP Router Intent Dataset](https://huggingface.co/datasets/naranor/WAMP-Router-Intent-Dataset) (Multilingual intent classification data)
+
 ## 📊 Research Results (Long Context, 100+ msgs)
 
-## Mode A: SAFE (Coding & Logic)
-*Recommended for AI Agents, Developers, and Technical QA.*
-**Goal:** 100% Information Recall.
+*Testing conducted on the unified **SetFit (MiniLM-L12)** engine with pure semantic features.*
 
 | Scenario                   | Algo      | Multiplier | Token Savings | Recall | Verdict | Description |
 |:---------------------------|:----------| :--------- | :------------ | :----- | :------ |:------------|
-| **Needle In A Haystack**   | Mean-MAX  | 0.98 | **17.1%** | **100%** | ✅ SAFE | Pinpoint fact retrieval (Argon2id test). |
-| **Multi-Doc Reasoning**    | Max-Max   | 0.92 | **0.9%** | **100%** | ✅ SAFE | Preserving complex logical links between docs. |
-| **Coherence & Summary**    | Mean-Mean | 0.90 | **43.0%** | 75% | ⚠️ FLOW | Maintaining technical architecture flow. |
+| **Fact Retrieval**         | CLS-MAX   | 0.99       | **28.6%**     | **100%** | ✅ SAFE | Pinpoint fact retrieval (Argon2id test). |
+| **Logic & Reasoning**      | CLS-MAX   | 0.95       | **0.0%**      | **100%** | ✅ SAFE | Preserving complex logical links between docs. |
+| **Coherence & Summary**    | CLS-MAX   | 0.99       | **36.8%**     | **75%+** | ⚠️ FLOW | Maintaining high-level architecture overview. |
 
-**Insight:** In Safe Mode, the proxy acts as a "noise gate." It only removes 100% redundant chatter while keeping every logical link and pinpoint fact intact.
+**Insight:** The SetFit engine achieves 100% accuracy in task routing and significantly better fact preservation (28% vs 17%) compared to earlier iterations.
 
-## 🧠 The Tri-modal Adaptive Engine
+## 🧠 The Tri-modal Adaptive Engine (V4)
 
-WAMP doesn't use a single "one-size-fits-all" algorithm. It routes tasks into specialized modes:
+WAMP automatically routes tasks into specialized modes using a high-precision **SetFit** semantic router:
 
-1.  **Fact Retrieval (Mean-MAX):** Focuses on semantic anchors to ensure pinpoint data like passwords or ports never get pruned.
-2.  **Logical Reasoning (Max-Max):** Uses absolute attention peaks to preserve the "connective tissue" between related messages in a chat.
-3.  **Summarization (Mean-Mean):** Aggressively prunes low-attention noise to provide the most compact context for general overviews.
+1.  **Fact Retrieval (Needle):** Optimized for pinpoint data (IPs, ports, keys). Uses aggressive multipliers to strip context while anchoring on the intent.
+2.  **Logical Reasoning (Reasoning):** Uses a conservative "Zero-Loss" policy (0.95 mult) to ensure every logical step remains available for the LLM.
+3.  **Summarization (Summary):** Maximizes context window space by pruning low-attention conversational filler and politeness.
 
 ## 🏗️ Architecture
 
 ```mermaid
 graph TD
     User([User App]) -->|Full Context| WAMP[WAMP Proxy]
-    WAMP -->|1. Intent Routing| Router{Hybrid Classifier}
-    Router -->|Needle| P1[Precise: Mean-MAX]
-    Router -->|Logic| P2[Logical: Max-MAX]
-    Router -->|Summary| P3[Broad: Mean-Mean]
+    WAMP -->|1. Intent Routing| Router{SetFit Semantic Router}
+    Router -->|Needle| P1[Precise: CLS-MAX]
+    Router -->|Logic| P2[Logical: CLS-MAX]
+    Router -->|Summary| P3[Broad: CLS-MAX]
     P1 & P2 & P3 -->|2. Pruning| Final[Compressed Context]
     Final -->|3. Forwarding| Upstream[[LLM Upstream]]
     Upstream -->|Response| User

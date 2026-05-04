@@ -1,7 +1,7 @@
 [project]
 name = "wamp-proxy"
-version = "1.0.0"
-description = "Smart OpenAI-compatible proxy with context compression using ModernBERT"
+version = "2.0.0"
+description = "Smart OpenAI-compatible proxy with context compression using Weighted Attention Message Pruner"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}

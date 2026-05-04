@@ -8,7 +8,7 @@ This file describes the structure and specifics of the **Weighted Attention Mess
 
 WAMP is a research-oriented context compression engine. It implements a **Tri-modal Adaptive Engine** that uses a high-precision composite classifier (89%+ accuracy) to select the optimal pruning strategy for each user query.
 
-**Core Model:** `DeBERTa-v3-small-NLI` (INT8 ONNX) – modified to expose hidden attention states.
+**Core Model:** `naranor/SetFit-Multilingual-ONNX-Router-V1` (INT8 ONNX) – modified to expose hidden attention states.
 
 ---
 
