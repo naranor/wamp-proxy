@@ -23,7 +23,11 @@ def upload_model(local_path, repo_id, repo_type="model"):
             repo_type=repo_type,
             commit_message=f"Initial upload of WAMP {repo_type}",
         )
-        print(f"🚀 Successfully uploaded to: https://huggingface.co/datasets/{repo_id}" if repo_type == "dataset" else f"🚀 Successfully uploaded to: https://huggingface.co/{repo_id}")
+        print(
+            f"🚀 Successfully uploaded to: https://huggingface.co/datasets/{repo_id}"
+            if repo_type == "dataset"
+            else f"🚀 Successfully uploaded to: https://huggingface.co/{repo_id}"
+        )
     except Exception as e:
         print(f"❌ Upload failed: {e}")
 

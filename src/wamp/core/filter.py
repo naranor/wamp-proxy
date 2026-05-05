@@ -21,8 +21,10 @@ from .config import (
 
 logger = logging.getLogger(__name__)
 
+
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
+
 
 class WAMPruner:
     def __init__(self, model_dir: str = None):
@@ -49,7 +51,7 @@ class WAMPruner:
         all_outputs = [o.name for o in self.session.get_outputs()]
         self.attention_layers = [o for o in all_outputs if o.startswith("attentions.")]
         self.attention_layers.sort(key=lambda x: int(x.split(".")[-1]))
-        
+
         # We use last 2 layers for stable filtering
         self.pruning_layers = self.attention_layers[-2:]
 
@@ -61,7 +63,9 @@ class WAMPruner:
                 self.router_weights = json.load(f)
             logger.info("SetFit Classification Head loaded successfully.")
         else:
-            logger.warning(f"Classification weights not found in {self.model_dir}. Router disabled.")
+            logger.warning(
+                f"Classification weights not found in {self.model_dir}. Router disabled."
+            )
 
         self._score_cache = {}
 
@@ -69,15 +73,28 @@ class WAMPruner:
         """Check if model files exist. Download from HF if missing."""
         required_files = ["tokenizer.json", "router_weights_setfit.json"]
         missing = [f for f in required_files if not (self.model_dir / f).exists()]
-        
-        if missing or (not (self.model_dir / "model_quantized.onnx").exists() and not (self.model_dir / "model.onnx").exists()):
-            logger.info(f"Model missing in {self.model_dir}. Attempting download: {FILTER_MODEL_NAME}...")
+
+        if missing or (
+            not (self.model_dir / "model_quantized.onnx").exists()
+            and not (self.model_dir / "model.onnx").exists()
+        ):
+            logger.info(
+                f"Model missing in {self.model_dir}. Attempting download: {FILTER_MODEL_NAME}..."
+            )
             try:
                 snapshot_download(
                     repo_id=FILTER_MODEL_NAME,
                     local_dir=self.model_dir,
                     local_dir_use_symlinks=False,
-                    ignore_patterns=["*.msgpack", "*.h5", "*.bin", "*.pt", "*.tflite", "*.ot", "model.onnx.data"]
+                    ignore_patterns=[
+                        "*.msgpack",
+                        "*.h5",
+                        "*.bin",
+                        "*.pt",
+                        "*.tflite",
+                        "*.ot",
+                        "model.onnx.data",
+                    ],
                 )
                 logger.info(f"✓ Model {FILTER_MODEL_NAME} downloaded successfully.")
             except Exception as e:
@@ -92,99 +109,104 @@ class WAMPruner:
         encoding = self.tokenizer.encode(task)
         ids = np.array([encoding.ids], dtype=np.int64)
         mask = np.array([encoding.attention_mask], dtype=np.int64)
-        
-        outputs = self.session.run(None, {'input_ids': ids, 'attention_mask': mask})
-        
+
+        outputs = self.session.run(None, {"input_ids": ids, "attention_mask": mask})
+
         # SetFit features: Mean Pooling of last hidden state (outputs[0])
         last_hidden = outputs[0]
         embeddings = np.mean(last_hidden, axis=1)
-        
+
         # LogReg Head
         coef = np.array(self.router_weights["coef"])
         intercept = np.array(self.router_weights["intercept"])
         scores = np.dot(embeddings, coef.T) + intercept
-        
+
         # Softmax for probabilities
         exp_scores = np.exp(scores - np.max(scores))
         probs = (exp_scores / exp_scores.sum())[0]
-        
+
         winner_idx = int(np.argmax(probs))
         inv_map = {0: "Summary", 1: "Needle", 2: "Reasoning"}
-        
+
         label = inv_map[winner_idx]
         confidence = float(probs[winner_idx])
-        
+
         logger.info(f"Task: '{task[:50]}...' -> Detected: {label} (p={confidence:.2f})")
         return label, confidence
 
-    def get_attention_filtered(self, messages: List[Dict[str, Any]], task: str) -> List[Dict[str, Any]]:
+    def get_attention_filtered(
+        self, messages: List[Dict[str, Any]], task: str
+    ) -> List[Dict[str, Any]]:
         """Filter messages using MiniLM attention weights with configurable algorithms."""
-        if not messages: return []
-        
+        if not messages:
+            return []
+
         # 1. Route task
         task_type, _ = self.classify_task(task)
-        
+
         # 2. Get Config (Multiplier & Algo)
         mult_map = {
             "Needle": float(FILTER_NEEDLE_MULT),
             "Reasoning": float(FILTER_REASONING_MULT),
-            "Summary": float(FILTER_SUMMARY_MULT)
+            "Summary": float(FILTER_SUMMARY_MULT),
         }
         algo_map = {
             "Needle": FILTER_NEEDLE_ALGO,
             "Reasoning": FILTER_REASONING_ALGO,
-            "Summary": FILTER_SUMMARY_ALGO
+            "Summary": FILTER_SUMMARY_ALGO,
         }
-        
+
         multiplier = mult_map.get(task_type, 1.0)
         algo = algo_map.get(task_type, "cls_max")
-        
+
         # 3. Calculate scores
         scores_dict = {}
         task_prompt = f"Analyze relevance to: '{task}'"
         task_enc = self.tokenizer.encode(task_prompt)
         task_len = len(task_enc.ids)
-        
+
         for i, msg in enumerate(messages):
             # Keep first (system) and last 2 messages
-            if i == 0 or i >= len(messages) - 2: continue
-            
+            if i == 0 or i >= len(messages) - 2:
+                continue
+
             content = self.get_content(msg)
             msg_key = hashlib.md5((task + content + algo).encode("utf-16")).hexdigest()
-            
+
             if msg_key in self._score_cache:
                 scores_dict[i] = self._score_cache[msg_key]
                 continue
-                
+
             msg_enc = self.tokenizer.encode(content)
             msg_len = len(msg_enc.ids)
             input_ids = (task_enc.ids + msg_enc.ids)[:FILTER_MAX_TOKENS]
             ids_np = np.array([input_ids], dtype=np.int64)
             mask_np = np.ones_like(ids_np)
-            
-            outputs = self.session.run(None, {'input_ids': ids_np, 'attention_mask': mask_np})
-            
+
+            outputs = self.session.run(None, {"input_ids": ids_np, "attention_mask": mask_np})
+
             importance = 0
             for layer_name in self.pruning_layers:
                 layer_idx = [o.name for o in self.session.get_outputs()].index(layer_name)
-                
+
                 # Full cross-attention slice: Task tokens vs Message tokens
                 # shape: [heads, q_len, m_len]
-                slc = outputs[layer_idx][0, :, :task_len, task_len:task_len+msg_len]
-                
-                if slc.size == 0: continue
-                
+                slc = outputs[layer_idx][0, :, :task_len, task_len : task_len + msg_len]
+
+                if slc.size == 0:
+                    continue
+
                 if algo == "mean_max":
                     importance += float(np.mean(np.max(slc, axis=2)))
                 elif algo == "cls_max":
-                    importance += float(np.max(slc[:, 0, :])) # Index 0 is [CLS]
+                    importance += float(np.max(slc[:, 0, :]))  # Index 0 is [CLS]
                 elif algo == "mean_mean":
                     importance += float(np.mean(slc))
                 elif algo == "max_max":
                     importance += float(np.max(slc))
                 else:
                     importance += float(np.max(slc[:, 0, :]))
-            
+
             score = importance / len(self.pruning_layers)
             scores_dict[i] = score
             self._score_cache[msg_key] = score
@@ -193,24 +215,29 @@ class WAMPruner:
         all_scores = list(scores_dict.values())
         baseline = np.median(all_scores) if all_scores else 0
         threshold = baseline * multiplier
-        
+
         # Use indices to avoid duplicates (e.g. when system prompt is within last 2)
         keep_indices = {0}
         for i in range(max(0, len(messages) - 2), len(messages)):
             keep_indices.add(i)
-            
+
         for i, msg in enumerate(messages):
-            if i in keep_indices: continue
+            if i in keep_indices:
+                continue
             if scores_dict.get(i, 0) >= threshold:
                 keep_indices.add(i)
-        
+
         filtered = [messages[i] for i in sorted(list(keep_indices))]
-        
-        logger.info(f"Filter ({task_type}, mult={multiplier}): {len(messages)} -> {len(filtered)} msgs (thr={threshold:.4f})")
+
+        logger.info(
+            f"Filter ({task_type}, mult={multiplier}): {len(messages)} -> {len(filtered)} msgs (thr={threshold:.4f})"
+        )
         return filtered
 
     def get_content(self, msg: Dict[str, Any]) -> str:
         content = msg.get("content", "")
         if isinstance(content, list):
-            return " ".join([part.get("text", "") for part in content if part.get("type") == "text"])
+            return " ".join(
+                [part.get("text", "") for part in content if part.get("type") == "text"]
+            )
         return str(content)

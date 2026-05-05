@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 
+
 def load_dataset_custom(filename):
     """Load DATA list from a python file manually."""
     with open(filename, "r", encoding="utf-8") as f:
@@ -9,31 +10,35 @@ def load_dataset_custom(filename):
         exec(content, {}, loc)
         return loc.get("DATA", [])
 
+
 def prepare_hf_dataset():
     print("=== PREPARING WAMP ROUTER DATASET FOR HUGGING FACE ===")
-    
+
     # 1. Load data
     summary_tasks = load_dataset_custom("tools/dataset_task_summary.py")
     needle_tasks = load_dataset_custom("tools/dataset_task_needle.py")
     reasoning_tasks = load_dataset_custom("tools/dataset_task_reasoning.py")
-    
+
     # 2. Create DataFrame
     # Labels: 0: Summary, 1: Needle, 2: Reasoning
     data = []
-    for t in summary_tasks: data.append({"text": t, "label": 0, "label_text": "Summary"})
-    for t in needle_tasks: data.append({"text": t, "label": 1, "label_text": "Needle"})
-    for t in reasoning_tasks: data.append({"text": t, "label": 2, "label_text": "Reasoning"})
-    
+    for t in summary_tasks:
+        data.append({"text": t, "label": 0, "label_text": "Summary"})
+    for t in needle_tasks:
+        data.append({"text": t, "label": 1, "label_text": "Needle"})
+    for t in reasoning_tasks:
+        data.append({"text": t, "label": 2, "label_text": "Reasoning"})
+
     df = pd.DataFrame(data)
-    
+
     # 3. Shuffle
     df = df.sample(frac=1, random_state=42).reset_index(drop=True)
-    
+
     # 4. Create directory and save
     os.makedirs("wamp_router_dataset", exist_ok=True)
     csv_path = "wamp_router_dataset/dataset.csv"
     df.to_csv(csv_path, index=False, encoding="utf-8")
-    
+
     print(f"✅ Dataset consolidated: {len(df)} samples.")
     print(f"🚀 CSV saved to {csv_path}")
 
@@ -81,6 +86,7 @@ Part of the **[Weighted Attention Message Pruner](https://github.com/naranor/wam
     with open("wamp_router_dataset/README.md", "w", encoding="utf-8") as f:
         f.write(readme_content)
     print("✅ Dataset Card (README.md) created.")
+
 
 if __name__ == "__main__":
     prepare_hf_dataset()
