@@ -22,3 +22,8 @@ FILTER_KEEP_LAST_N = int(os.getenv("FILTER_KEEP_LAST_N", "4"))
 FILTER_NEEDLE_MULT = float(os.getenv("FILTER_NEEDLE_MULT", "0.98"))
 FILTER_REASONING_MULT = float(os.getenv("FILTER_REASONING_MULT", "1.02"))
 FILTER_SUMMARY_MULT = float(os.getenv("FILTER_SUMMARY_MULT", "1.05"))
+
+# Pruning Algorithms (mean_max, cls_max, mean_mean, max_max)
+FILTER_NEEDLE_ALGO = os.getenv("FILTER_NEEDLE_ALGO", "cls_max")
+FILTER_REASONING_ALGO = os.getenv("FILTER_REASONING_ALGO", "cls_max")
+FILTER_SUMMARY_ALGO = os.getenv("FILTER_SUMMARY_ALGO", "cls_max")

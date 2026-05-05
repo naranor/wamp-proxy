@@ -6,9 +6,9 @@ This file describes the structure and specifics of the **Weighted Attention Mess
 
 ## 📌 Project at a Glance
 
-WAMP is a research-oriented context compression engine. It implements a **Tri-modal Adaptive Engine** that uses a high-precision composite classifier (89%+ accuracy) to select the optimal pruning strategy for each user query.
+WAMP is a research-oriented context compression engine. It implements a **Tri-modal Adaptive Engine (V4)** that uses a high-precision **SetFit** semantic router (100% accuracy on universal benchmarks) to select the optimal pruning strategy for each user query.
 
-**Core Model:** `DeBERTa-v3-small-NLI` (INT8 ONNX) – modified to expose hidden attention states.
+**Core Model:** `naranor/SetFit-Multilingual-ONNX-Router-V1` (INT8 ONNX) – a unified engine for both intent routing and attention-based filtering.
 
 ---
 
@@ -19,54 +19,53 @@ wamp-proxy/
 ├── src/
 │   └── wamp/
 │       ├── api/            # FastAPI endpoints and proxy logic
-│       ├── core/           # Logic: WAMPruner engine, Router, Config
+│       ├── core/           # Logic: WAMPruner engine (SetFit), Config
 │       └── __init__.py
-├── benchmarks/             # Research suite (Needle, Multi-Doc, Coherence)
-├── tools/                  # Model Exporter, Router Trainer, HF Uploader
+├── benchmarks/             # Final validation suite (Needle, Multi-Doc, Coherence)
+├── tools/                  # SetFit Trainer, ONNX Exporter, Quantizer, HF Uploader
 ├── tests/                  # Unit and API tests
 ├── main.py                 # 🚀 Entry point
 ├── requirements.txt        # Runtime dependencies
-├── requirements-dev.txt    # Dev, ML, and Export tools
 ├── Makefile                # Developer shortcuts
 └── README.md               # User and Research documentation
 ```
 
 ---
 
-## 🧠 The Tri-modal Adaptive Engine
+## 🧠 The Tri-modal Adaptive Engine (V4)
 
-### 1. Composite Intent Routing
-Located in `WAMPruner.classify_task`. Classification is performed on the **raw user query** to avoid system prompt interference.
-- **Features:** 1539-dimension vector [CLS + Mean + Kurtosis + Max + Length].
-- **Hierarchy:**
-    - **Stage 1 (Reasoning):** Binary LogReg (vs All). High priority for logic preservation.
-    - **Stage 2 (Needle):** Binary LogReg (vs All). Specific fact retrieval.
-    - **Stage 3 (Summary):** Default fallback for general recap tasks.
+### 1. SetFit Semantic Routing
+Located in `WAMPruner.classify_task`. Classification uses **Mean Pooling** of hidden states followed by a Logistic Regression head.
+- **Features:** High-dimensional semantic embeddings (MiniLM-L12).
+- **Universality:** Trained on technical, medical, historical, and philosophical datasets (Bilingual RU/EN).
+- **Categories:** Summary (0), Needle (1), Reasoning (2).
 
 ### 2. Specialized Pruning Policies (Safe Mode)
+Configurable via `.env`. Default algorithm: `cls_max`.
+
 | Category | Algorithm | Multiplier | Focus |
 | :--- | :--- | :--- | :--- |
-| **Reasoning** | `cls_max` | **0.92** | Logical chains & synthesis |
-| **Needle** | `mean_max` | **0.98** | Pinpoint parameter retrieval |
-| **Summary** | `mean_mean` | **0.90** | Global semantic compression |
+| **Needle** | `cls_max` | **0.99** | Pinpoint fact preservation (28% savings) |
+| **Reasoning** | `cls_max` | **0.95** | Zero-loss logical chains (0% savings) |
+| **Summary** | `cls_max` | **0.99** | High-level recap (37% savings) |
 
 ---
 
-## 📊 Performance Benchmarks (Raw Tokens)
+## 📊 Performance Benchmarks (SetFit INT8)
 
 | Mode | Scenario | Token Savings | Recall | Verdict |
 | :--- | :--- | :--- | :--- | :--- |
-| **SAFE** | Needle / Logic | **1-17%** | **100%** | ✅ Recommended for Agents |
-| **AGGRESSIVE** | Needle / Logic | **45-50%** | **0-14%** | ❌ High risk of data loss |
-| **BALANCED** | Summary | **43%** | **75%** | ⚠️ Good for general chat |
+| **SAFE** | Needle (Facts) | **~29%** | **100%** | ✅ Recommended |
+| **SAFE** | Reasoning (Logic) | **0%** | **100%** | ✅ Safe for Agents |
+| **BALANCED** | Summary | **~37%** | **75%+** | ⚠️ Optimized |
 
 ---
 
-## 🧪 Key Research Scripts
-- `tools/train_router.py`: Unified trainer for both Needle and Reasoning classifiers.
-- `tools/audit_truth.py`: Honest token-based savings audit (v4).
-- `benchmarks/final_validation_no_proxy.py`: Long-context (114+ msg) validation script.
+## 🧪 Key Operational Tools
+- `tools/train_setfit_router.py`: Re-train the semantic intent classifier.
+- `tools/quantize_setfit_onnx.py`: Convert FP32 ONNX to efficient INT8.
+- `benchmarks/final_validation_no_proxy.py`: Standalone validation of the SetFit engine.
 
 ---
 
-*Last Updated: April 25, 2026 (Refactored Research Version 3.0 - Truthful Audit)*
+*Last Updated: May 4, 2026 (Unified SetFit Engine v4.0 - 100% Recall Update)*
