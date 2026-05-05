@@ -194,12 +194,17 @@ class WAMPruner:
         baseline = np.median(all_scores) if all_scores else 0
         threshold = baseline * multiplier
         
-        filtered = [messages[0]]
+        # Use indices to avoid duplicates (e.g. when system prompt is within last 2)
+        keep_indices = {0}
+        for i in range(max(0, len(messages) - 2), len(messages)):
+            keep_indices.add(i)
+            
         for i, msg in enumerate(messages):
-            if i == 0 or i >= len(messages) - 2: continue
+            if i in keep_indices: continue
             if scores_dict.get(i, 0) >= threshold:
-                filtered.append(msg)
-        filtered.extend(messages[-2:])
+                keep_indices.add(i)
+        
+        filtered = [messages[i] for i in sorted(list(keep_indices))]
         
         logger.info(f"Filter ({task_type}, mult={multiplier}): {len(messages)} -> {len(filtered)} msgs (thr={threshold:.4f})")
         return filtered

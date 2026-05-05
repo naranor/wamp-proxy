@@ -10,13 +10,14 @@ services:
     environment:
       - UPSTREAM_URL=${UPSTREAM_URL:-http://192.168.92.2:8383/api/v1}
       - ENABLE_ATTENTION_FILTER=${ENABLE_ATTENTION_FILTER:-true}
-      - FILTER_MODEL_DIR=${FILTER_MODEL_DIR:-/app/deberta_nli_model}
+      - HF_MODEL_NAME=${HF_MODEL_NAME:-naranor/SetFit-Multilingual-ONNX-Router-V1}
+      - FILTER_MODEL_DIR=${FILTER_MODEL_DIR:-/app/model}
       - FILTER_THRESHOLD_MULTIPLIER=${FILTER_THRESHOLD_MULTIPLIER:-1.0}
-      - FILTER_NEEDLE_MULT=${FILTER_NEEDLE_MULT:-0.98}
-      - FILTER_REASONING_MULT=${FILTER_REASONING_MULT:-0.92}
-      - FILTER_SUMMARY_MULT=${FILTER_SUMMARY_MULT:-0.90}
+      - FILTER_NEEDLE_MULT=${FILTER_NEEDLE_MULT:-0.99}
+      - FILTER_REASONING_MULT=${FILTER_REASONING_MULT:-0.95}
+      - FILTER_SUMMARY_MULT=${FILTER_SUMMARY_MULT:-0.99}
       - FILTER_MAX_TOKENS=${FILTER_MAX_TOKENS:-1024}
     restart: unless-stopped
     volumes:
-      - ./deberta_nli_model:/app/deberta_nli_model
+      - ./model:/app/model
       - ./logs:/app/logs
