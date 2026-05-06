@@ -36,7 +36,8 @@ class WAMPruner:
         # Load Tokenizer
         tokenizer_path = self.model_dir / "tokenizer.json"
         self.tokenizer = Tokenizer.from_file(str(tokenizer_path))
-        self.tokenizer.enable_truncation(max_length=FILTER_MAX_TOKENS)
+        # Disable fixed truncation at initialization for sliding window flexibility
+        self.tokenizer.no_truncation()
 
         # Load ONNX model (Always use quantized if available)
         model_file = self.model_dir / "model_quantized.onnx"
@@ -106,9 +107,10 @@ class WAMPruner:
         if not self.router_weights:
             return "Summary", 1.0
 
+        # Truncate for classification to avoid exceeding model limits
         encoding = self.tokenizer.encode(task)
-        ids = np.array([encoding.ids], dtype=np.int64)
-        mask = np.array([encoding.attention_mask], dtype=np.int64)
+        ids = np.array([encoding.ids[:FILTER_MAX_TOKENS]], dtype=np.int64)
+        mask = np.array([[1] * len(ids[0])], dtype=np.int64)
 
         outputs = self.session.run(None, {"input_ids": ids, "attention_mask": mask})
 
@@ -137,7 +139,7 @@ class WAMPruner:
     def get_attention_filtered(
         self, messages: List[Dict[str, Any]], task: str
     ) -> List[Dict[str, Any]]:
-        """Filter messages using MiniLM attention weights with configurable algorithms."""
+        """Filter messages using MiniLM attention weights with configurable algorithms and sliding window."""
         if not messages:
             return []
 
@@ -162,8 +164,16 @@ class WAMPruner:
         # 3. Calculate scores
         scores_dict = {}
         task_prompt = f"Analyze relevance to: '{task}'"
+        
+        # Tokenize task WITHOUT truncation first to see its real length
         task_enc = self.tokenizer.encode(task_prompt)
-        task_len = len(task_enc.ids)
+        task_ids = task_enc.ids
+        
+        # Limit task to half of the available window to ensure we can scan messages
+        max_task_len = FILTER_MAX_TOKENS // 2
+        if len(task_ids) > max_task_len:
+            task_ids = task_ids[:max_task_len]
+        task_len = len(task_ids)
 
         for i, msg in enumerate(messages):
             # Keep first (system) and last 2 messages
@@ -177,37 +187,69 @@ class WAMPruner:
                 scores_dict[i] = self._score_cache[msg_key]
                 continue
 
+            # Tokenize message WITHOUT truncation to scan it fully
             msg_enc = self.tokenizer.encode(content)
-            msg_len = len(msg_enc.ids)
-            input_ids = (task_enc.ids + msg_enc.ids)[:FILTER_MAX_TOKENS]
-            ids_np = np.array([input_ids], dtype=np.int64)
-            mask_np = np.ones_like(ids_np)
+            msg_ids = msg_enc.ids
+            msg_len = len(msg_ids)
 
-            outputs = self.session.run(None, {"input_ids": ids_np, "attention_mask": mask_np})
+            # --- SLIDING WINDOW LOGIC ---
+            # Ensure we NEVER exceed FILTER_MAX_TOKENS (usually 512)
+            max_chunk_size = FILTER_MAX_TOKENS - task_len
+            if max_chunk_size <= 0:
+                # Should not happen with max_task_len limit above
+                max_chunk_size = 1
+                
+            overlap = 64
+            stride = max(1, max_chunk_size - overlap)
+            
+            chunk_scores = []
+            
+            # Scan the entire message in chunks
+            for start_idx in range(0, max(1, msg_len), stride):
+                end_idx = min(start_idx + max_chunk_size, msg_len)
+                current_msg_chunk = msg_ids[start_idx:end_idx]
+                if not current_msg_chunk:
+                    break
+                    
+                input_ids = task_ids + current_msg_chunk
+                
+                # Double check length for ONNX safety
+                if len(input_ids) > FILTER_MAX_TOKENS:
+                    input_ids = input_ids[:FILTER_MAX_TOKENS]
+                    
+                ids_np = np.array([input_ids], dtype=np.int64)
+                mask_np = np.ones_like(ids_np)
 
-            importance = 0
-            for layer_name in self.pruning_layers:
-                layer_idx = [o.name for o in self.session.get_outputs()].index(layer_name)
+                outputs = self.session.run(None, {"input_ids": ids_np, "attention_mask": mask_np})
 
-                # Full cross-attention slice: Task tokens vs Message tokens
-                # shape: [heads, q_len, m_len]
-                slc = outputs[layer_idx][0, :, :task_len, task_len : task_len + msg_len]
+                importance = 0
+                chunk_msg_len = len(current_msg_chunk)
+                for layer_name in self.pruning_layers:
+                    layer_idx = [o.name for o in self.session.get_outputs()].index(layer_name)
+                    # slc shape: [heads, q_len, chunk_msg_len]
+                    slc = outputs[layer_idx][0, :, :task_len, task_len : task_len + chunk_msg_len]
 
-                if slc.size == 0:
-                    continue
+                    if slc.size == 0:
+                        continue
 
-                if algo == "mean_max":
-                    importance += float(np.mean(np.max(slc, axis=2)))
-                elif algo == "cls_max":
-                    importance += float(np.max(slc[:, 0, :]))  # Index 0 is [CLS]
-                elif algo == "mean_mean":
-                    importance += float(np.mean(slc))
-                elif algo == "max_max":
-                    importance += float(np.max(slc))
-                else:
-                    importance += float(np.max(slc[:, 0, :]))
+                    if algo == "mean_max":
+                        importance += float(np.mean(np.max(slc, axis=2)))
+                    elif algo == "cls_max":
+                        importance += float(np.max(slc[:, 0, :]))
+                    elif algo == "mean_mean":
+                        importance += float(np.mean(slc))
+                    elif algo == "max_max":
+                        importance += float(np.max(slc))
+                    else:
+                        importance += float(np.max(slc[:, 0, :]))
 
-            score = importance / len(self.pruning_layers)
+                chunk_scores.append(importance / len(self.pruning_layers))
+                
+                # If we processed the whole message, stop
+                if end_idx >= msg_len:
+                    break
+
+            score = max(chunk_scores) if chunk_scores else 0
             scores_dict[i] = score
             self._score_cache[msg_key] = score
 
