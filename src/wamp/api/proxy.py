@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 from typing import Dict, Any
 
-from ..core.config import UPSTREAM_URL, ENABLE_ATTENTION_FILTER, FILTER_KEEP_LAST_N
+from ..core.config import UPSTREAM_URL, ENABLE_ATTENTION_FILTER
 from ..core.filter import WAMPruner
 
 logger = logging.getLogger(__name__)
@@ -67,9 +67,7 @@ async def apply_filter(body_dict: Dict[str, Any]) -> Dict[str, Any]:
 
         body_dict["messages"] = filtered
         stype = "stream" if body_dict.get("stream") else "non-stream"
-        logger.info(
-            f"[Filter] {stype}: {len(messages)} → {len(filtered)} msgs"
-        )
+        logger.info(f"[Filter] {stype}: {len(messages)} → {len(filtered)} msgs")
     except Exception as e:
         logger.error(f"Filter error: {e}")
 

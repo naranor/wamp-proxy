@@ -164,11 +164,11 @@ class WAMPruner:
         # 3. Calculate scores
         scores_dict = {}
         task_prompt = f"Analyze relevance to: '{task}'"
-        
+
         # Tokenize task WITHOUT truncation first to see its real length
         task_enc = self.tokenizer.encode(task_prompt)
         task_ids = task_enc.ids
-        
+
         # Limit task to half of the available window to ensure we can scan messages
         max_task_len = FILTER_MAX_TOKENS // 2
         if len(task_ids) > max_task_len:
@@ -198,25 +198,25 @@ class WAMPruner:
             if max_chunk_size <= 0:
                 # Should not happen with max_task_len limit above
                 max_chunk_size = 1
-                
+
             overlap = 64
             stride = max(1, max_chunk_size - overlap)
-            
+
             chunk_scores = []
-            
+
             # Scan the entire message in chunks
             for start_idx in range(0, max(1, msg_len), stride):
                 end_idx = min(start_idx + max_chunk_size, msg_len)
                 current_msg_chunk = msg_ids[start_idx:end_idx]
                 if not current_msg_chunk:
                     break
-                    
+
                 input_ids = task_ids + current_msg_chunk
-                
+
                 # Double check length for ONNX safety
                 if len(input_ids) > FILTER_MAX_TOKENS:
                     input_ids = input_ids[:FILTER_MAX_TOKENS]
-                    
+
                 ids_np = np.array([input_ids], dtype=np.int64)
                 mask_np = np.ones_like(ids_np)
 
@@ -244,7 +244,7 @@ class WAMPruner:
                         importance += float(np.max(slc[:, 0, :]))
 
                 chunk_scores.append(importance / len(self.pruning_layers))
-                
+
                 # If we processed the whole message, stop
                 if end_idx >= msg_len:
                     break
