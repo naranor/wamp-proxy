@@ -1,14 +1,49 @@
 # 🛠️ AI Agents Instructions (AGENTS.md)
 
-This file describes the structure and specifics of the **Weighted Attention Message Pruner (WAMP)** project. Use it for context when working with the codebase.
+This file describes the evolution and structure of the **Weighted Attention Message Pruner (WAMP)** project. It serves as a technical reference for both available context engines.
 
 ---
 
-## 📌 Project at a Glance
+## 📌 Project Overview
 
-WAMP is a research-oriented context compression engine. It implements a **Tri-modal Adaptive Engine (V4)** that uses a high-precision **SetFit** semantic router (100% accuracy on universal benchmarks) to select the optimal pruning strategy for each user query.
+WAMP is a research-oriented middleware for context compression. It implements a **Tri-modal Adaptive Engine** that uses semantic routing to select the optimal pruning policy for each user query.
 
-**Core Model:** `naranor/SetFit-Multilingual-ONNX-Router-V1` (INT8 ONNX) – a unified engine for both intent routing and attention-based filtering.
+### Core Architecture (V4.1)
+The system supports multiple transformer-based encoders in ONNX format. Pruning is based on raw attention weights extracted from the model's final layers.
+
+---
+
+## 🧠 Engine Comparison & Technical Details
+
+### 1. ModernBERT-base (Standard / Production)
+*Best for long-context tasks (up to 8192 tokens).*
+- **Architecture:** 22 layers, Rotary Embeddings, Unpadding.
+- **WAMP Export:** Last 2 attention layers (20-21) to optimize memory.
+- **Routing:** SetFit-trained classifier with 100% accuracy.
+- **Capabilities:** High-precision analysis of complex agent trajectories.
+
+**Validated Settings:**
+| Category | Algorithm | Multiplier | Token Savings | Recall |
+| :--- | :--- | :--- | :--- | :--- |
+| **Needle** | `cls_max` | **0.98** | **38.3%** | 100% |
+| **Reasoning** | `max_max` | **0.74** | **39.7%** | 100% |
+| **Summary** | `max_max` | **1.00** | **55.7%** | 88% |
+
+---
+
+### 2. SetFit MiniLM-L12 (Compact / Fast)
+*Best for low-resource environments and high speed.*
+- **Architecture:** 12 layers, 512 token limit.
+- **WAMP Export:** Full 12-layer attention matrix support.
+- **Routing:** Original SetFit implementation (100% accuracy).
+- **Capabilities:** Fast fact retrieval and conversational recaps.
+
+**Validated Settings:**
+| Category | Algorithm | Multiplier | Token Savings | Recall |
+| :--- | :--- | :--- | :--- | :--- |
+| **Needle** | `cls_max` | **0.99** | **28.6%** | 100% |
+| **Reasoning** | `cls_max` | **0.95** | **0%** | 100% |
+| **Summary** | `cls_max` | **0.99** | **36.8%** | 75% |
 
 ---
 
@@ -32,40 +67,12 @@ wamp-proxy/
 
 ---
 
-## 🧠 The Tri-modal Adaptive Engine (V4)
+## 🧪 Research Evolution Context
 
-### 1. SetFit Semantic Routing
-Located in `WAMPruner.classify_task`. Classification uses **Mean Pooling** of hidden states followed by a Logistic Regression head.
-- **Features:** High-dimensional semantic embeddings (MiniLM-L12).
-- **Universality:** Trained on technical, medical, historical, and philosophical datasets (Bilingual RU/EN).
-- **Categories:** Summary (0), Needle (1), Reasoning (2).
-
-### 2. Specialized Pruning Policies (Safe Mode)
-Configurable via `.env`. Default algorithm: `cls_max`.
-
-| Category | Algorithm | Multiplier | Focus |
-| :--- | :--- | :--- | :--- |
-| **Needle** | `cls_max` | **0.99** | Pinpoint fact preservation (28% savings) |
-| **Reasoning** | `cls_max` | **0.95** | Zero-loss logical chains (0% savings) |
-| **Summary** | `cls_max` | **0.99** | High-level recap (37% savings) |
+1.  **DeBERTa-v3 (Legacy):** Initial research into tri-modal classification. Proved the "Cliff Effect" in attention pruning.
+2.  **MiniLM-L12 (Unified V4):** Introduced 100% accurate SetFit routing.
+3.  **ModernBERT (V4.1):** Solved context window limits and memory allocation issues via Sliding Window and optimized export.
 
 ---
 
-## 📊 Performance Benchmarks (SetFit INT8)
-
-| Mode | Scenario | Token Savings | Recall | Verdict |
-| :--- | :--- | :--- | :--- | :--- |
-| **SAFE** | Needle (Facts) | **~29%** | **100%** | ✅ Recommended |
-| **SAFE** | Reasoning (Logic) | **0%** | **100%** | ✅ Safe for Agents |
-| **BALANCED** | Summary | **~37%** | **75%+** | ⚠️ Optimized |
-
----
-
-## 🧪 Key Operational Tools
-- `tools/train_setfit_router.py`: Re-train the semantic intent classifier.
-- `tools/quantize_setfit_onnx.py`: Convert FP32 ONNX to efficient INT8.
-- `benchmarks/final_validation_no_proxy.py`: Standalone validation of the SetFit engine.
-
----
-
-*Last Updated: May 4, 2026 (Unified SetFit Engine v4.0 - 100% Recall Update)*
+*Last Updated: May 8, 2026 (Final Comparative Research Version)*
