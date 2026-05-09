@@ -12,7 +12,7 @@ UPSTREAM_URL = os.getenv("UPSTREAM_URL", "https://api.openai.com").rstrip("/")
 
 # Filter settings
 ENABLE_ATTENTION_FILTER = os.getenv("ENABLE_ATTENTION_FILTER", "true").lower() == "true"
-FILTER_MODEL_NAME = os.getenv("HF_MODEL_NAME", "naranor/ModernBERT-base-ONNX-Attentions")
+FILTER_MODEL_NAME = os.getenv("HF_MODEL_NAME", "naranor/SetFit-ModernBERT-WAMP-V1")
 FILTER_MODEL_DIR = os.getenv("FILTER_MODEL_DIR", str(BASE_DIR / "modernbert_model"))
 FILTER_THRESHOLD_MULTIPLIER = float(os.getenv("FILTER_THRESHOLD_MULTIPLIER", "1.5"))
 FILTER_MAX_TOKENS = int(os.getenv("FILTER_MAX_TOKENS", "1024"))
