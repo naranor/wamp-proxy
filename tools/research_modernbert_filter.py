@@ -43,9 +43,9 @@ def run_modernbert_research():
         print(f"\n--- Testing Scenario: {name} ---")
         msgs = data["msgs"]
         task_query = data["task"]
-        critical = data["critical"]
 
         # Calculate original tokens (approx)
+
         total_tokens_before = sum(len(pruner.tokenizer.encode(m["content"]).ids) for m in msgs)
 
         task_prompt = f"Analyze relevance to: '{task_query}'"

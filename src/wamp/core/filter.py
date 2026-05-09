@@ -163,10 +163,10 @@ class WAMPruner:
         # 3. Calculate scores
         scores_dict = {}
         task_prompt = f"Analyze relevance to: '{task}'"
-        
+
         task_enc = self.tokenizer.encode(task_prompt)
         task_ids = task_enc.ids
-        
+
         # Ensure task doesn't leave less than a small buffer for message scan
         limit_for_task = max(1, FILTER_MAX_TOKENS - 128)
         if len(task_ids) > limit_for_task:
@@ -194,14 +194,14 @@ class WAMPruner:
                 window_size = 1
 
             chunk_scores = []
-            
+
             for start_idx in range(0, max(1, msg_len), window_size):
                 end_idx = min(start_idx + window_size, msg_len)
                 current_msg_chunk = msg_ids[start_idx:end_idx]
-                
+
                 if not current_msg_chunk:
                     break
-                    
+
                 input_ids = task_ids + current_msg_chunk
                 ids_np = np.array([input_ids], dtype=np.int64)
                 mask_np = np.ones_like(ids_np)
@@ -213,7 +213,7 @@ class WAMPruner:
                 for layer_name in self.pruning_layers:
                     layer_idx = [o.name for o in self.session.get_outputs()].index(layer_name)
                     slc = outputs[layer_idx][0, :, :task_len, task_len : task_len + chunk_msg_len]
-                    
+
                     if slc.size == 0:
                         continue
 
@@ -229,7 +229,7 @@ class WAMPruner:
                         importance += float(np.max(slc[:, 0, :]))
 
                 chunk_scores.append(importance / len(self.pruning_layers))
-                
+
                 if end_idx >= msg_len:
                     break
 
