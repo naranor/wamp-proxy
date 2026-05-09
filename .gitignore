@@ -63,3 +63,8 @@ model/
 /setfit_router_model/
 /wamp_router_dataset/
 /checkpoints/
+/modernbert_router_model/
+/model_modernbert_onnx/
+/model_debug.onnx
+/model_debug.onnx.data
+/.env_orig2

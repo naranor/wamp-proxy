@@ -36,7 +36,6 @@ class WAMPruner:
         # Load Tokenizer
         tokenizer_path = self.model_dir / "tokenizer.json"
         self.tokenizer = Tokenizer.from_file(str(tokenizer_path))
-        # Disable fixed truncation at initialization for sliding window flexibility
         self.tokenizer.no_truncation()
 
         # Load ONNX model (Always use quantized if available)
@@ -48,13 +47,14 @@ class WAMPruner:
         session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         self.session = ort.InferenceSession(str(model_file), session_options)
 
-        # Map outputs: last_hidden_state and attentions.0...11
+        # Map outputs
         all_outputs = [o.name for o in self.session.get_outputs()]
         self.attention_layers = [o for o in all_outputs if o.startswith("attentions.")]
         self.attention_layers.sort(key=lambda x: int(x.split(".")[-1]))
 
-        # We use last 2 layers for stable filtering
+        # Use up to 2 last layers for pruning
         self.pruning_layers = self.attention_layers[-2:]
+        logger.info(f"Using attention layers for pruning: {self.pruning_layers}")
 
         # Load SetFit Classifier Head
         self.router_weights = None
@@ -107,14 +107,13 @@ class WAMPruner:
         if not self.router_weights:
             return "Summary", 1.0
 
-        # Truncate for classification to avoid exceeding model limits
         encoding = self.tokenizer.encode(task)
+        # Use entire allowed window for routing
         ids = np.array([encoding.ids[:FILTER_MAX_TOKENS]], dtype=np.int64)
         mask = np.array([[1] * len(ids[0])], dtype=np.int64)
 
         outputs = self.session.run(None, {"input_ids": ids, "attention_mask": mask})
 
-        # SetFit features: Mean Pooling of last hidden state (outputs[0])
         last_hidden = outputs[0]
         embeddings = np.mean(last_hidden, axis=1)
 
@@ -139,7 +138,7 @@ class WAMPruner:
     def get_attention_filtered(
         self, messages: List[Dict[str, Any]], task: str
     ) -> List[Dict[str, Any]]:
-        """Filter messages using MiniLM attention weights with configurable algorithms and sliding window."""
+        """Filter messages using attention weights with sliding window logic."""
         if not messages:
             return []
 
@@ -165,18 +164,16 @@ class WAMPruner:
         scores_dict = {}
         task_prompt = f"Analyze relevance to: '{task}'"
 
-        # Tokenize task WITHOUT truncation first to see its real length
         task_enc = self.tokenizer.encode(task_prompt)
         task_ids = task_enc.ids
 
-        # Limit task to half of the available window to ensure we can scan messages
-        max_task_len = FILTER_MAX_TOKENS // 2
-        if len(task_ids) > max_task_len:
-            task_ids = task_ids[:max_task_len]
+        # Ensure task doesn't leave less than a small buffer for message scan
+        limit_for_task = max(1, FILTER_MAX_TOKENS - 128)
+        if len(task_ids) > limit_for_task:
+            task_ids = task_ids[:limit_for_task]
         task_len = len(task_ids)
 
         for i, msg in enumerate(messages):
-            # Keep first (system) and last 2 messages
             if i == 0 or i >= len(messages) - 2:
                 continue
 
@@ -187,36 +184,25 @@ class WAMPruner:
                 scores_dict[i] = self._score_cache[msg_key]
                 continue
 
-            # Tokenize message WITHOUT truncation to scan it fully
             msg_enc = self.tokenizer.encode(content)
             msg_ids = msg_enc.ids
             msg_len = len(msg_ids)
 
-            # --- SLIDING WINDOW LOGIC ---
-            # Ensure we NEVER exceed FILTER_MAX_TOKENS (usually 512)
-            max_chunk_size = FILTER_MAX_TOKENS - task_len
-            if max_chunk_size <= 0:
-                # Should not happen with max_task_len limit above
-                max_chunk_size = 1
-
-            overlap = 64
-            stride = max(1, max_chunk_size - overlap)
+            # --- DYNAMIC SLIDING WINDOW ---
+            window_size = FILTER_MAX_TOKENS - task_len
+            if window_size <= 0:
+                window_size = 1
 
             chunk_scores = []
 
-            # Scan the entire message in chunks
-            for start_idx in range(0, max(1, msg_len), stride):
-                end_idx = min(start_idx + max_chunk_size, msg_len)
+            for start_idx in range(0, max(1, msg_len), window_size):
+                end_idx = min(start_idx + window_size, msg_len)
                 current_msg_chunk = msg_ids[start_idx:end_idx]
+
                 if not current_msg_chunk:
                     break
 
                 input_ids = task_ids + current_msg_chunk
-
-                # Double check length for ONNX safety
-                if len(input_ids) > FILTER_MAX_TOKENS:
-                    input_ids = input_ids[:FILTER_MAX_TOKENS]
-
                 ids_np = np.array([input_ids], dtype=np.int64)
                 mask_np = np.ones_like(ids_np)
 
@@ -226,7 +212,6 @@ class WAMPruner:
                 chunk_msg_len = len(current_msg_chunk)
                 for layer_name in self.pruning_layers:
                     layer_idx = [o.name for o in self.session.get_outputs()].index(layer_name)
-                    # slc shape: [heads, q_len, chunk_msg_len]
                     slc = outputs[layer_idx][0, :, :task_len, task_len : task_len + chunk_msg_len]
 
                     if slc.size == 0:
@@ -245,7 +230,6 @@ class WAMPruner:
 
                 chunk_scores.append(importance / len(self.pruning_layers))
 
-                # If we processed the whole message, stop
                 if end_idx >= msg_len:
                     break
 
@@ -258,7 +242,6 @@ class WAMPruner:
         baseline = np.median(all_scores) if all_scores else 0
         threshold = baseline * multiplier
 
-        # Use indices to avoid duplicates (e.g. when system prompt is within last 2)
         keep_indices = {0}
         for i in range(max(0, len(messages) - 2), len(messages)):
             keep_indices.add(i)
